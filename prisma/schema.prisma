@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String?   @unique
+  phone         String?   @unique
+  passwordHash  String?
+  avatarUrl     String?
+  bannerUrl     String?
+  bio           String?
+  status        String?
+  isOnline      Boolean   @default(false)
+  lastSeen      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sentMessages     Message[] @relation("sentMessages")
+  receivedMessages Message[] @relation("receivedMessages")
+  chats            ChatParticipant[]
+  groups           GroupMember[]
+  posts            Post[]
+  stories          Story[]
+  followers        Follow[]  @relation("following")
+  following        Follow[]  @relation("followers")
+}
+
+model Chat {
+  id         String   @id @default(cuid())
+  isGroup    Boolean  @default(false)
+  name       String?
+  imageUrl   String?
+  createdAt  DateTime @default(now())
+
+  participants ChatParticipant[]
+  messages     Message[]
+}
+
+model Message {
+  id           String    @id @default(cuid())
+  chatId       String
+  senderId     String
+  content      String?
+  messageType  MessageType @default(TEXT) // TEXT, IMAGE, VIDEO, VOICE, FILE, STICKER
+  fileUrl      String?
+  thumbnailUrl String?
+  replyToId    String?
+  isDeleted    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  editedAt     DateTime?
+
+  chat         Chat      @relation(fields: [chatId], references: [id])
+  sender       User      @relation("sentMessages", fields: [senderId], references: [id])
+  replyTo      Message?  @relation("replies", fields: [replyToId], references: [id])
+  replies      Message[] @relation("replies")
+  reactions    Reaction[]
+}
+
+model Post {
+  id           String    @id @default(cuid())
+  authorId     String
+  content      String
+  mediaUrls    String[]  // array de URLs
+  communityId  String?
+  visibility   Visibility @default(PUBLIC) // PUBLIC, FRIENDS, ONLY_ME
+  createdAt    DateTime  @default(now())
+
+  author       User      @relation(fields: [authorId], references: [id])
+  likes        Like[]
+  comments     Comment[]
+}
+
+model Community {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  avatarUrl   String?
+  bannerUrl   String?
+  isPrivate   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  members     CommunityMember[]
+  posts       Post[]
+  moderators  String[] // userIds
+}
+
+model Story {
+  id        String   @id @default(cuid())
+  userId    String
+  mediaUrl  String
+  mediaType String   // PHOTO ou VIDEO
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  views     StoryView[]
+}
+
+model ChatParticipant {
+  id        String   @id @default(cuid())
+  chatId    String
+  userId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@id([chatId, userId])
+}
+
+model GroupMember {
+  id        String   @id @default(cuid())
+  groupId   String
+  userId    String
+  // group     Group    @relation(fields: [groupId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@id([groupId, userId])
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  follower    User   @relation("followers", fields: [followerId], references: [id])
+  following   User   @relation("following", fields: [followingId], references: [id])
+
+  @@id([followerId, followingId])
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  message   Message  @relation(fields: [messageId], references: [id])
+
+  @@unique([messageId, userId, emoji])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@unique([postId, userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  content   String
+  post      Post     @relation(fields: [postId], references: [id])
+}
+
+model CommunityMember {
+  id          String    @id @default(cuid())
+  communityId String
+  userId      String
+  community   Community @relation(fields: [communityId], references: [id])
+
+  @@id([communityId, userId])
+}
+
+model StoryView {
+  id      String @id @default(cuid())
+  storyId String
+  userId  String
+  story   Story  @relation(fields: [storyId], references: [id])
+
+  @@id([storyId, userId])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  VOICE
+  FILE
+  STICKER
+}
+
+enum Visibility {
+  PUBLIC
+  FRIENDS
+  ONLY_ME
+}
